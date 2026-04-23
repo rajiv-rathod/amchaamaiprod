@@ -2,8 +2,10 @@
 
 Single-user local Linux web portal (no login/password) to:
 - upload bill of lading CSV data
-- search companies (shipper/consignee/importer/exporter)
-- collect contact hints (email/phone/website/address)
+- search companies (shipper/consignee/importer/exporter/sender/receiver)
+- search by HS/HX code
+- collect categorized contact info (sender/receiver/importer/exporter/other)
+- collect contact hints (email/phone/website/address + bill number + HS/HX code)
 - enrich from free sources (ImportYeti + OpenCorporates API)
 - serve through Nginx on `info.adminoabc.org`
 
@@ -45,3 +47,4 @@ Then point DNS A record for `info.adminoabc.org` to your server IP.
 ## Notes
 - Contacts are aggregated from raw shipping rows + free web sources; always verify manually before outreach.
 - ImportYeti page structure may change; enrichment is best effort and intentionally low-cost.
+- Sender/receiver contacts are inferred from BOL columns and shown in categorized searchable format.

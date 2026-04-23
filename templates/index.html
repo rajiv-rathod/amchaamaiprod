@@ -3,151 +3,339 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bill of Lading Contact Portal</title>
+  <title>BOL Intelligence Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: Inter, Arial, sans-serif; margin: 24px; background: #f4f7fb; color: #0f172a; }
-    .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08); }
-    h1, h2 { margin-top: 0; }
-    input, button, select { padding: 9px; font-size: 14px; border: 1px solid #d6dce8; border-radius: 8px; }
-    button { cursor: pointer; background: #2563eb; border-color: #2563eb; color: #fff; }
-    button:hover { background: #1d4ed8; }
-    input[type=text] { min-width: 220px; }
-    .grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
-    .chip { background: #eef2ff; color: #3730a3; padding: 6px 10px; border-radius: 999px; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
-    th { background: #eef2ff; }
-    .muted { color: #6b7280; font-size: 13px; }
+    body { font-family: Inter, system-ui, sans-serif; }
+    .badge-sender   { background:#dcfce7; color:#166534; }
+    .badge-receiver { background:#dbeafe; color:#1e40af; }
+    .badge-importer { background:#fff7ed; color:#9a3412; }
+    .badge-exporter { background:#f3e8ff; color:#6b21a8; }
+    .badge-other    { background:#f1f5f9; color:#475569; }
+    .truncate-cell  { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   </style>
 </head>
-<body>
-  <h1>Bill of Lading Contact Portal</h1>
-  <p class="muted">Single-user local portal (no login). Search clean, categorized Sender/Receiver contacts, including HS/HX code, email, and phone.</p>
-  {% if uploaded %}
-  <p><strong>Upload complete:</strong> {{ uploaded }} rows ingested.</p>
-  {% endif %}
+<body class="bg-slate-50 text-slate-900 min-h-screen">
 
-  <div class="card">
-    <h2>1) Upload Bill of Lading CSV</h2>
-    <form method="post" action="/upload" enctype="multipart/form-data">
-      <label>Source:</label>
-      <select name="source">
-        <option value="oec-bulk">OEC bulk download</option>
-        <option value="manual-import">Manual import</option>
-        <option value="other-free-source">Other free source</option>
-      </select>
-      <br><br>
-      <input type="file" name="file" accept=".csv" required>
-      <button type="submit">Upload</button>
-    </form>
-  </div>
+  <!-- ── Header / stats bar ── -->
+  <header class="bg-white border-b border-slate-200 shadow-sm">
+    <div class="max-w-screen-xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold leading-tight">🚢 BOL Intelligence Portal</h1>
+        <p class="text-sm text-slate-500">Real-time shipping data · 100 % free public sources</p>
+      </div>
+      <div class="flex gap-6 text-center">
+        <div>
+          <div class="text-2xl font-bold text-blue-600">{{ stats.shipments }}</div>
+          <div class="text-xs text-slate-500 uppercase tracking-wide">Shipments</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-emerald-600">{{ stats.contacts }}</div>
+          <div class="text-xs text-slate-500 uppercase tracking-wide">Contacts</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-violet-600">{{ stats.companies }}</div>
+          <div class="text-xs text-slate-500 uppercase tracking-wide">Companies</div>
+        </div>
+      </div>
+    </div>
+  </header>
 
-  <div class="card">
-    <h2>2) Search & categorize</h2>
-    <form method="get" action="/" class="grid">
-      <input type="text" name="q" value="{{ query }}" placeholder="Company (sender/receiver/importer/exporter)">
-      <input type="text" name="hs" value="{{ hs }}" placeholder="HS / HX code">
-      <select name="role">
-        <option value="all" {% if selected_role == "all" %}selected{% endif %}>All roles</option>
-        <option value="sender" {% if selected_role == "sender" %}selected{% endif %}>Sender</option>
-        <option value="receiver" {% if selected_role == "receiver" %}selected{% endif %}>Receiver</option>
-        <option value="importer" {% if selected_role == "importer" %}selected{% endif %}>Importer</option>
-        <option value="exporter" {% if selected_role == "exporter" %}selected{% endif %}>Exporter</option>
-        <option value="other" {% if selected_role == "other" %}selected{% endif %}>Other (web enrichment)</option>
-      </select>
-      <button type="submit">Search</button>
-    </form>
-    {% if query %}
-    <form method="post" action="/enrich" style="margin-top: 10px;">
-      <input type="hidden" name="company" value="{{ query }}">
-      <button type="submit">Enrich contacts from free web sources</button>
-    </form>
-    {% endif %}
-    {% if query or hs %}
-    <div class="stats">
-      <span class="chip">Contacts: {{ contacts|length }}</span>
-      <span class="chip">Shipments: {{ shipments|length }}</span>
-      <span class="chip">Role filter: {{ selected_role }}</span>
-      <span class="chip">HS/HX filter: {{ hs or "none" }}</span>
+  <main class="max-w-screen-xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- ── Flash message ── -->
+    {% if msg %}
+    <div class="rounded-xl border px-5 py-3 text-sm
+      {% if 'No new' in msg %}bg-amber-50 border-amber-200 text-amber-800
+      {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+      {{ msg }}
     </div>
     {% endif %}
-  </div>
 
-  {% if query or hs %}
-  <div class="card">
-    <h2>Categorized contacts ({{ contacts|length }})</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Role</th>
-          <th>Company</th>
-          <th>Bill No.</th>
-          <th>HS/HX Code</th>
-          <th>Source</th>
-          <th>Email</th>
-          <th>Phone</th>
-          <th>Website</th>
-          <th>Address</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in contacts %}
-        <tr>
-          <td>{{ row.role or "other" }}</td>
-          <td>{{ row.company }}</td>
-          <td>{{ row.bill_number or "" }}</td>
-          <td>{{ row.hs_code or "" }}</td>
-          <td>{{ row.source }}</td>
-          <td>{{ row.email or "" }}</td>
-          <td>{{ row.phone or "" }}</td>
-          <td>{{ row.website or "" }}</td>
-          <td>{{ row.address or "" }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="9">No contact records yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <!-- ── Primary: Fetch from Internet ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <h2 class="text-lg font-semibold mb-0.5">🌐 Fetch from the Internet</h2>
+      <p class="text-sm text-slate-500 mb-5">
+        Type a company name and we'll pull real shipment records from
+        <strong>ImportYeti</strong> (US Customs import data) and
+        <strong>OpenCorporates</strong> — no upload needed, totally free.
+      </p>
+      <form method="post" action="/fetch" class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[240px]">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Company name *</label>
+          <input type="text" name="company" value="{{ query }}"
+            placeholder="e.g. Samsung, Nike, Apple, COSCO …" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="w-40">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">HS code (optional)</label>
+          <input type="text" name="hs" value="{{ hs }}" placeholder="e.g. 6110"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <button type="submit"
+          class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold
+                 px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm">
+          🔍 Fetch &amp; Save
+        </button>
+      </form>
+    </div>
 
-  <div class="card">
-    <h2>Shipment matches ({{ shipments|length }})</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Bill</th>
-          <th>HS/HX Code</th>
-          <th>Shipper</th>
-          <th>Consignee</th>
-          <th>Importer</th>
-          <th>Exporter</th>
-          <th>Origin</th>
-          <th>Destination</th>
-          <th>Arrival</th>
-          <th>Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in shipments %}
-        <tr>
-          <td>{{ row.bill_number or "" }}</td>
-          <td>{{ row.hs_code or "" }}</td>
-          <td>{{ row.shipper or "" }}</td>
-          <td>{{ row.consignee or "" }}</td>
-          <td>{{ row.importer or "" }}</td>
-          <td>{{ row.exporter or "" }}</td>
-          <td>{{ row.origin_port or "" }}</td>
-          <td>{{ row.destination_port or "" }}</td>
-          <td>{{ row.arrival_date or "" }}</td>
-          <td>{{ row.source }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="10">No shipments matched.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
+    <!-- ── Secondary: Search local DB ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <h2 class="text-base font-semibold mb-4 text-slate-700">🔎 Search local database</h2>
+      <form method="get" action="/" class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Company</label>
+          <input type="text" name="q" value="{{ query }}"
+            placeholder="Shipper / consignee / importer …"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="w-36">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">HS/HX code</label>
+          <input type="text" name="hs" value="{{ hs }}" placeholder="e.g. 8471"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="w-40">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Role</label>
+          <select name="role"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="all"      {% if selected_role == "all"      %}selected{% endif %}>All roles</option>
+            <option value="sender"   {% if selected_role == "sender"   %}selected{% endif %}>Sender</option>
+            <option value="receiver" {% if selected_role == "receiver" %}selected{% endif %}>Receiver</option>
+            <option value="importer" {% if selected_role == "importer" %}selected{% endif %}>Importer</option>
+            <option value="exporter" {% if selected_role == "exporter" %}selected{% endif %}>Exporter</option>
+            <option value="other"    {% if selected_role == "other"    %}selected{% endif %}>Other</option>
+          </select>
+        </div>
+        <button type="submit"
+          class="bg-slate-700 hover:bg-slate-800 text-white font-semibold
+                 px-5 py-2 rounded-lg text-sm transition-colors">
+          Search
+        </button>
+        {% if query or hs %}
+        <a href="/export?q={{ query|urlencode }}&hs={{ hs|urlencode }}&role={{ selected_role }}"
+          class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium
+                 px-4 py-2 rounded-lg text-sm transition-colors">
+          ⬇ Export CSV
+        </a>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- ── Results ── -->
+    {% if query or hs %}
+
+    <!-- Contacts table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <h2 class="text-lg font-semibold mb-4">
+        Contacts
+        <span class="text-sm font-normal text-slate-500">({{ contacts|length }} found)</span>
+      </h2>
+      {% if contacts %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b-2 border-slate-200 text-left">
+              <th class="py-2 px-3 font-semibold text-slate-600">Role</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Company</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Bill No.</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">HS Code</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Email</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Phone</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Website</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Address</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in contacts %}
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+              <td class="py-2 px-3">
+                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold
+                  badge-{{ row.role or 'other' }}">
+                  {{ row.role or "other" }}
+                </span>
+              </td>
+              <td class="py-2 px-3 font-medium">{{ row.company }}</td>
+              <td class="py-2 px-3 text-slate-500 text-xs">{{ row.bill_number or "—" }}</td>
+              <td class="py-2 px-3 text-slate-500">{{ row.hs_code or "—" }}</td>
+              <td class="py-2 px-3">
+                {% if row.email %}
+                  <a href="mailto:{{ row.email }}" class="text-blue-600 hover:underline">{{ row.email }}</a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="py-2 px-3">{{ row.phone or "—" }}</td>
+              <td class="py-2 px-3 truncate-cell">
+                {% if row.website %}
+                  <a href="{{ row.website }}" target="_blank" rel="noopener"
+                     class="text-blue-600 hover:underline" title="{{ row.website }}">
+                    {{ row.website }}
+                  </a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="py-2 px-3 text-slate-500 truncate-cell" title="{{ row.address or '' }}">
+                {{ row.address or "—" }}
+              </td>
+              <td class="py-2 px-3 text-slate-400 text-xs">{{ row.source }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">
+        No contacts yet for this query.
+        Use <strong>Fetch from the Internet</strong> above to pull live data.
+      </p>
+      {% endif %}
+    </div>
+
+    <!-- Shipments table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <h2 class="text-lg font-semibold mb-4">
+        Shipments
+        <span class="text-sm font-normal text-slate-500">({{ shipments|length }} found)</span>
+      </h2>
+      {% if shipments %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b-2 border-slate-200 text-left">
+              <th class="py-2 px-3 font-semibold text-slate-600">Bill</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">HS Code</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Shipper</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Consignee</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Origin</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Destination</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Arrival</th>
+              <th class="py-2 px-3 font-semibold text-slate-600">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in shipments %}
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+              <td class="py-2 px-3 text-slate-400 text-xs">{{ row.bill_number or "—" }}</td>
+              <td class="py-2 px-3 text-slate-500">{{ row.hs_code or "—" }}</td>
+              <td class="py-2 px-3 font-medium">{{ row.shipper or "—" }}</td>
+              <td class="py-2 px-3">{{ row.consignee or "—" }}</td>
+              <td class="py-2 px-3 text-slate-500">{{ row.origin_port or "—" }}</td>
+              <td class="py-2 px-3 text-slate-500">{{ row.destination_port or "—" }}</td>
+              <td class="py-2 px-3 text-slate-500">{{ row.arrival_date or "—" }}</td>
+              <td class="py-2 px-3 text-slate-400 text-xs">{{ row.source }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">No shipments matched. Try Fetch from the Internet above.</p>
+      {% endif %}
+    </div>
+
+    <!-- ── Home / empty state ── -->
+    {% else %}
+      {% if recent %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold mb-4">Recent shipments in database</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead>
+              <tr class="border-b-2 border-slate-200 text-left">
+                <th class="py-2 px-3 font-semibold text-slate-600">Shipper</th>
+                <th class="py-2 px-3 font-semibold text-slate-600">Consignee</th>
+                <th class="py-2 px-3 font-semibold text-slate-600">HS Code</th>
+                <th class="py-2 px-3 font-semibold text-slate-600">Origin → Destination</th>
+                <th class="py-2 px-3 font-semibold text-slate-600">Arrival</th>
+                <th class="py-2 px-3 font-semibold text-slate-600">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in recent %}
+              <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td class="py-2 px-3 font-medium">
+                  {% if row.shipper %}
+                    <a href="/?q={{ row.shipper|urlencode }}" class="text-blue-600 hover:underline">
+                      {{ row.shipper }}
+                    </a>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="py-2 px-3">{{ row.consignee or "—" }}</td>
+                <td class="py-2 px-3 text-slate-500">{{ row.hs_code or "—" }}</td>
+                <td class="py-2 px-3 text-slate-500">
+                  {{ row.origin_port or "?" }} → {{ row.destination_port or "?" }}
+                </td>
+                <td class="py-2 px-3 text-slate-500">{{ row.arrival_date or "—" }}</td>
+                <td class="py-2 px-3 text-slate-400 text-xs">{{ row.source }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 text-center">
+        <div class="text-6xl mb-5">🚢</div>
+        <h2 class="text-2xl font-bold text-slate-700 mb-3">No data yet — that's fine!</h2>
+        <p class="text-slate-500 max-w-lg mx-auto mb-6">
+          Enter any company name in the <strong>Fetch from the Internet</strong> box above
+          and click <strong>Fetch &amp; Save</strong>. We'll pull real US import shipment
+          records from ImportYeti and save them here automatically.
+        </p>
+        <p class="text-xs text-slate-400">
+          Powered by ImportYeti (public US Customs AMS data) · OpenCorporates (public company registry)
+        </p>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <!-- ── Upload CSV (collapsible, secondary) ── -->
+    <details class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <summary class="cursor-pointer text-sm font-semibold text-slate-600 select-none list-none flex items-center gap-2">
+        <span>📂</span> Upload a CSV file (optional, for bulk local import)
+        <span class="ml-auto text-slate-400 text-xs font-normal">click to expand</span>
+      </summary>
+      <div class="mt-5 pt-5 border-t border-slate-100">
+        <form method="post" action="/upload" enctype="multipart/form-data"
+              class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Source label</label>
+            <select name="source"
+              class="border border-slate-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="oec-bulk">OEC bulk download</option>
+              <option value="manual-import">Manual import</option>
+              <option value="other-free-source">Other free source</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">CSV file</label>
+            <input type="file" name="file" accept=".csv" required class="text-sm">
+          </div>
+          <button type="submit"
+            class="bg-slate-600 hover:bg-slate-700 text-white font-semibold
+                   px-5 py-2 rounded-lg text-sm transition-colors">
+            Upload
+          </button>
+        </form>
+        <p class="text-xs text-slate-400 mt-3">
+          Supports any CSV with columns like: shipper, consignee, importer, exporter, hs_code, bill, origin, destination, arrival.
+        </p>
+      </div>
+    </details>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-100">
+    Data sources: <a href="https://www.importyeti.com" target="_blank" class="hover:underline">ImportYeti</a>
+    · <a href="https://api.opencorporates.com" target="_blank" class="hover:underline">OpenCorporates</a>
+    · <a href="https://oec.world/en/resources/bulk-download/bill-of-lading" target="_blank" class="hover:underline">OEC</a>
+    — all free &amp; public. Always verify contacts before outreach.
+  </footer>
+
 </body>
 </html>

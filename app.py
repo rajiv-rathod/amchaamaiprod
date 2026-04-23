@@ -82,6 +82,11 @@ def normalize_str(value: Any) -> str:
     return str(value).strip()
 
 
+def to_like_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    return f"%{escaped}%"
+
+
 def pick_field(row: dict[str, Any], names: list[str]) -> str:
     lowered = {k.lower().strip(): normalize_str(v) for k, v in row.items()}
     for name in names:
@@ -267,13 +272,16 @@ def fetch_opencorporates_contacts(company: str) -> list[dict[str, Any]]:
 
 
 def find_shipments(company: str) -> list[sqlite3.Row]:
-    pattern = f"%{company}%"
+    pattern = to_like_pattern(company)
     with closing(get_db()) as conn:
         rows = conn.execute(
             """
             SELECT *
             FROM shipments
-            WHERE shipper LIKE ? OR consignee LIKE ? OR importer LIKE ? OR exporter LIKE ?
+            WHERE shipper LIKE ? ESCAPE '\'
+               OR consignee LIKE ? ESCAPE '\'
+               OR importer LIKE ? ESCAPE '\'
+               OR exporter LIKE ? ESCAPE '\'
             ORDER BY id DESC
             LIMIT 100
             """,
@@ -283,13 +291,13 @@ def find_shipments(company: str) -> list[sqlite3.Row]:
 
 
 def find_contacts(company: str) -> list[sqlite3.Row]:
-    pattern = f"%{company}%"
+    pattern = to_like_pattern(company)
     with closing(get_db()) as conn:
         rows = conn.execute(
             """
             SELECT *
             FROM contacts
-            WHERE company LIKE ?
+            WHERE company LIKE ? ESCAPE '\'
             ORDER BY id DESC
             LIMIT 100
             """,

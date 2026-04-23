@@ -27,7 +27,10 @@ server {
 EOF
 
 ln -sf "${NGINX_CONF}" "${NGINX_LINK}"
-nginx -t
+if ! nginx -t; then
+  echo "Nginx config test failed. Please fix the config and rerun."
+  exit 1
+fi
 systemctl reload nginx
 
 echo "Nginx configured. Point DNS A record for ${DOMAIN} to this server IP."

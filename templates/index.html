@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bill of Lading Contact Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7f7; color: #1f2937; }
+    .card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+    h1, h2 { margin-top: 0; }
+    input, button, select { padding: 8px; font-size: 14px; }
+    input[type=text] { width: min(640px, 90%); }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f3f4f6; }
+    .muted { color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Bill of Lading Contact Portal</h1>
+  <p class="muted">Single-user local portal (no login). Upload BOL CSV and enrich company contacts from ImportYeti + free sources.</p>
+
+  <div class="card">
+    <h2>1) Upload Bill of Lading CSV</h2>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <label>Source:</label>
+      <select name="source">
+        <option value="oec-bulk">OEC bulk download</option>
+        <option value="manual-import">Manual import</option>
+        <option value="other-free-source">Other free source</option>
+      </select>
+      <br><br>
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Upload</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>2) Search company</h2>
+    <form method="get" action="/">
+      <input type="text" name="q" value="{{ query }}" placeholder="e.g. ABC Exports Pvt Ltd">
+      <button type="submit">Search</button>
+    </form>
+    {% if query %}
+    <form method="post" action="/enrich" style="margin-top: 10px;">
+      <input type="hidden" name="company" value="{{ query }}">
+      <button type="submit">Enrich contacts from free web sources</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if query %}
+  <div class="card">
+    <h2>Contacts ({{ contacts|length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Source</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Website</th>
+          <th>Address</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in contacts %}
+        <tr>
+          <td>{{ row.company }}</td>
+          <td>{{ row.source }}</td>
+          <td>{{ row.email or "" }}</td>
+          <td>{{ row.phone or "" }}</td>
+          <td>{{ row.website or "" }}</td>
+          <td>{{ row.address or "" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No contact records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Shipment matches ({{ shipments|length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Bill</th>
+          <th>Shipper</th>
+          <th>Consignee</th>
+          <th>Importer</th>
+          <th>Exporter</th>
+          <th>Origin</th>
+          <th>Destination</th>
+          <th>Arrival</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in shipments %}
+        <tr>
+          <td>{{ row.bill_number or "" }}</td>
+          <td>{{ row.shipper or "" }}</td>
+          <td>{{ row.consignee or "" }}</td>
+          <td>{{ row.importer or "" }}</td>
+          <td>{{ row.exporter or "" }}</td>
+          <td>{{ row.origin_port or "" }}</td>
+          <td>{{ row.destination_port or "" }}</td>
+          <td>{{ row.arrival_date or "" }}</td>
+          <td>{{ row.source }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9">No shipments matched.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</body>
+</html>

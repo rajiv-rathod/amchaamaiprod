@@ -1,1 +1,39 @@
-# amchaamaiprod
+# Bill of Lading Contact Portal
+
+Single-user local Linux web portal (no login/password) to:
+- upload bill of lading CSV data
+- search companies (shipper/consignee/importer/exporter)
+- collect contact hints (email/phone/website/address)
+- enrich from free sources (ImportYeti + OpenCorporates API)
+- serve through Nginx on `info.adminoabc.org`
+
+## Data sources
+- OEC bulk download (manual CSV upload): https://oec.world/en/resources/bulk-download/bill-of-lading
+- ImportYeti search scraping (best effort): https://www.importyeti.com
+- OpenCorporates (free public company registry data): https://api.opencorporates.com
+
+## Quick start (local Linux)
+
+```bash
+cd /home/runner/work/amchaamaiprod/amchaamaiprod
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 app.py
+```
+
+Open: `http://<server-ip>:8080`
+
+## Nginx auto setup for domain forwarding
+
+```bash
+cd /home/runner/work/amchaamaiprod/amchaamaiprod
+chmod +x scripts/setup_nginx.sh
+sudo ./scripts/setup_nginx.sh info.adminoabc.org 8080
+```
+
+Then point DNS A record for `info.adminoabc.org` to your server IP.
+
+## Notes
+- Contacts are aggregated from raw shipping rows + free web sources; always verify manually before outreach.
+- ImportYeti page structure may change; enrichment is best effort and intentionally low-cost.

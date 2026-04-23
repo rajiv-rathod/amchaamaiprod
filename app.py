@@ -16,6 +16,7 @@ from flask import Flask, redirect, render_template, request, url_for
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data.db")
 IMPORTYETI_BASE = "https://www.importyeti.com"
+IMPORTYETI_DOMAIN = "importyeti.com"
 OPENCORPORATES_SEARCH_URL = "https://api.opencorporates.com/v0.4/companies/search"
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_PATTERN = re.compile(r"\+?\d[\d(). -]{6,}\d")
@@ -218,7 +219,7 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
         if not parsed.netloc or not parsed.scheme.startswith("http"):
             continue
         host = parsed.netloc.lower()
-        if host == "importyeti.com" or host.endswith(".importyeti.com"):
+        if host == IMPORTYETI_DOMAIN or host.endswith(f".{IMPORTYETI_DOMAIN}"):
             continue
         query_keys = [key.lower() for key in parse_qs(parsed.query, keep_blank_values=True).keys()]
         if any(key.startswith("utm_") or key in {"gclid", "fbclid"} for key in query_keys):

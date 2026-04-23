@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bill of Lading Contact Portal</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin: 24px; background: #f4f7fb; color: #0f172a; }
+    .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08); }
+    h1, h2 { margin-top: 0; }
+    input, button, select { padding: 9px; font-size: 14px; border: 1px solid #d6dce8; border-radius: 8px; }
+    button { cursor: pointer; background: #2563eb; border-color: #2563eb; color: #fff; }
+    button:hover { background: #1d4ed8; }
+    input[type=text] { min-width: 220px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .chip { background: #eef2ff; color: #3730a3; padding: 6px 10px; border-radius: 999px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #eef2ff; }
+    .muted { color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Bill of Lading Contact Portal</h1>
+  <p class="muted">Single-user local portal (no login). Search clean, categorized Sender/Receiver contacts, including HS/HX code, email, and phone.</p>
+  {% if uploaded %}
+  <p><strong>Upload complete:</strong> {{ uploaded }} rows ingested.</p>
+  {% endif %}
+
+  <div class="card">
+    <h2>1) Upload Bill of Lading CSV</h2>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <label>Source:</label>
+      <select name="source">
+        <option value="oec-bulk">OEC bulk download</option>
+        <option value="manual-import">Manual import</option>
+        <option value="other-free-source">Other free source</option>
+      </select>
+      <br><br>
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Upload</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>2) Search & categorize</h2>
+    <form method="get" action="/" class="grid">
+      <input type="text" name="q" value="{{ query }}" placeholder="Company (sender/receiver/importer/exporter)">
+      <input type="text" name="hs" value="{{ hs }}" placeholder="HS / HX code">
+      <select name="role">
+        <option value="all" {% if selected_role == "all" %}selected{% endif %}>All roles</option>
+        <option value="sender" {% if selected_role == "sender" %}selected{% endif %}>Sender</option>
+        <option value="receiver" {% if selected_role == "receiver" %}selected{% endif %}>Receiver</option>
+        <option value="importer" {% if selected_role == "importer" %}selected{% endif %}>Importer</option>
+        <option value="exporter" {% if selected_role == "exporter" %}selected{% endif %}>Exporter</option>
+        <option value="other" {% if selected_role == "other" %}selected{% endif %}>Other (web enrichment)</option>
+      </select>
+      <button type="submit">Search</button>
+    </form>
+    {% if query %}
+    <form method="post" action="/enrich" style="margin-top: 10px;">
+      <input type="hidden" name="company" value="{{ query }}">
+      <button type="submit">Enrich contacts from free web sources</button>
+    </form>
+    {% endif %}
+    {% if query or hs %}
+    <div class="stats">
+      <span class="chip">Contacts: {{ contacts|length }}</span>
+      <span class="chip">Shipments: {{ shipments|length }}</span>
+      <span class="chip">Role filter: {{ selected_role }}</span>
+      <span class="chip">HS/HX filter: {{ hs or "none" }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if query or hs %}
+  <div class="card">
+    <h2>Categorized contacts ({{ contacts|length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Company</th>
+          <th>Bill No.</th>
+          <th>HS/HX Code</th>
+          <th>Source</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Website</th>
+          <th>Address</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in contacts %}
+        <tr>
+          <td>{{ row.role or "other" }}</td>
+          <td>{{ row.company }}</td>
+          <td>{{ row.bill_number or "" }}</td>
+          <td>{{ row.hs_code or "" }}</td>
+          <td>{{ row.source }}</td>
+          <td>{{ row.email or "" }}</td>
+          <td>{{ row.phone or "" }}</td>
+          <td>{{ row.website or "" }}</td>
+          <td>{{ row.address or "" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9">No contact records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Shipment matches ({{ shipments|length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Bill</th>
+          <th>HS/HX Code</th>
+          <th>Shipper</th>
+          <th>Consignee</th>
+          <th>Importer</th>
+          <th>Exporter</th>
+          <th>Origin</th>
+          <th>Destination</th>
+          <th>Arrival</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in shipments %}
+        <tr>
+          <td>{{ row.bill_number or "" }}</td>
+          <td>{{ row.hs_code or "" }}</td>
+          <td>{{ row.shipper or "" }}</td>
+          <td>{{ row.consignee or "" }}</td>
+          <td>{{ row.importer or "" }}</td>
+          <td>{{ row.exporter or "" }}</td>
+          <td>{{ row.origin_port or "" }}</td>
+          <td>{{ row.destination_port or "" }}</td>
+          <td>{{ row.arrival_date or "" }}</td>
+          <td>{{ row.source }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10">No shipments matched.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</body>
+</html>

@@ -18,7 +18,11 @@ DB_PATH = os.path.join(BASE_DIR, "data.db")
 IMPORTYETI_BASE = "https://www.importyeti.com"
 OPENCORPORATES_SEARCH_URL = "https://api.opencorporates.com/v0.4/companies/search"
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-PHONE_PATTERN = re.compile(r"(?:\+\d{1,3}[ -]?)?(?:\(?\d{2,4}\)?[ -]?)?\d{3,4}[ -]?\d{3,4}")
+PHONE_PATTERN = re.compile(r"\+?\d[\d(). -]{6,}\d")
+REQUEST_TIMEOUT_SECONDS = 20
+MAX_CONTACT_VALUES = 5
+MAX_OPENCORPORATES_RESULTS = 5
+MIN_PHONE_DIGITS = 8
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -87,8 +91,8 @@ def extract_contacts(text: str) -> tuple[list[str], list[str]]:
         return [], []
     emails = sorted(set(EMAIL_PATTERN.findall(text)))
     phones = sorted(set(PHONE_PATTERN.findall(text)))
-    phones = [p for p in phones if len(re.sub(r"\D", "", p)) >= 7]
-    return emails[:5], phones[:5]
+    phones = [p for p in phones if len(re.sub(r"\D", "", p)) >= MIN_PHONE_DIGITS]
+    return emails[:MAX_CONTACT_VALUES], phones[:MAX_CONTACT_VALUES]
 
 
 def ingest_csv(file_bytes: bytes, source: str) -> int:
@@ -186,7 +190,7 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
     query = quote_plus(company)
     url = f"{IMPORTYETI_BASE}/search?term={query}"
     try:
-        response = requests.get(url, timeout=20)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
     except requests.RequestException:
         return []
@@ -200,7 +204,7 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
         href = anchor["href"]
         if href.startswith("http") and "importyeti.com" not in href:
             websites.append(href)
-    websites = sorted(set(websites))[:5]
+    websites = sorted(set(websites))[:MAX_CONTACT_VALUES]
 
     records = []
     if emails or phones or websites:
@@ -220,8 +224,8 @@ def fetch_opencorporates_contacts(company: str) -> list[dict[str, Any]]:
     try:
         response = requests.get(
             OPENCORPORATES_SEARCH_URL,
-            params={"q": company, "per_page": 5},
-            timeout=20,
+            params={"q": company, "per_page": MAX_OPENCORPORATES_RESULTS},
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         payload = response.json()

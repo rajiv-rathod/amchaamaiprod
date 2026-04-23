@@ -24,6 +24,14 @@ python3 app.py
 
 Open: `http://<server-ip>:8080`
 
+For production-style serving behind Nginx, run with Gunicorn:
+
+```bash
+source .venv/bin/activate
+pip install gunicorn
+gunicorn --bind 127.0.0.1:8080 app:app
+```
+
 ## Nginx auto setup for domain forwarding
 
 ```bash

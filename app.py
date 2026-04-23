@@ -7,7 +7,7 @@ import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,6 +23,11 @@ REQUEST_TIMEOUT_SECONDS = 20
 MAX_CONTACT_VALUES = 5
 MAX_OPENCORPORATES_RESULTS = 5
 MIN_PHONE_DIGITS = 8
+MAX_COMPANIES_PER_ROW = 2
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -137,7 +142,7 @@ def ingest_csv(file_bytes: bytes, source: str) -> int:
 
             emails, phones = extract_contacts(row_text)
             company_candidates = [c for c in [shipper, consignee, importer, exporter] if c]
-            for company in company_candidates[:2]:
+            for company in company_candidates[:MAX_COMPANIES_PER_ROW]:
                 conn.execute(
                     """
                     INSERT INTO contacts (company, source, email, phone, website, address, raw_json, created_at)
@@ -190,7 +195,7 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
     query = quote_plus(company)
     url = f"{IMPORTYETI_BASE}/search?term={query}"
     try:
-        response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
+        response = requests.get(url, headers=DEFAULT_HEADERS, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
     except requests.RequestException:
         return []
@@ -202,8 +207,14 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
     websites: list[str] = []
     for anchor in soup.find_all("a", href=True):
         href = anchor["href"]
-        if href.startswith("http") and "importyeti.com" not in href:
-            websites.append(href)
+        if not href.startswith("http") or "importyeti.com" in href:
+            continue
+        parsed = urlparse(href)
+        if not parsed.netloc or not parsed.scheme.startswith("http"):
+            continue
+        if parsed.query and any(k in parsed.query.lower() for k in ["utm_", "gclid", "fbclid"]):
+            continue
+        websites.append(f"{parsed.scheme}://{parsed.netloc}{parsed.path or ''}")
     websites = sorted(set(websites))[:MAX_CONTACT_VALUES]
 
     records = []

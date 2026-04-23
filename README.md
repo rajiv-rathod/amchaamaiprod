@@ -15,7 +15,7 @@ Single-user local Linux web portal (no login/password) to:
 ## Quick start (local Linux)
 
 ```bash
-cd /home/runner/work/amchaamaiprod/amchaamaiprod
+cd /path/to/project
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -35,7 +35,7 @@ gunicorn --bind 127.0.0.1:8080 app:app
 ## Nginx auto setup for domain forwarding
 
 ```bash
-cd /home/runner/work/amchaamaiprod/amchaamaiprod
+cd /path/to/project
 chmod +x scripts/setup_nginx.sh
 sudo ./scripts/setup_nginx.sh info.adminoabc.org 8080
 ```

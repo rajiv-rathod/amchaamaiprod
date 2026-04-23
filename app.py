@@ -7,7 +7,7 @@ import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -207,12 +207,16 @@ def fetch_importyeti_contacts(company: str) -> list[dict[str, Any]]:
     websites: list[str] = []
     for anchor in soup.find_all("a", href=True):
         href = anchor["href"]
-        if not href.startswith("http") or "importyeti.com" in href:
+        if not href.startswith("http"):
             continue
         parsed = urlparse(href)
         if not parsed.netloc or not parsed.scheme.startswith("http"):
             continue
-        if parsed.query and any(k in parsed.query.lower() for k in ["utm_", "gclid", "fbclid"]):
+        host = parsed.netloc.lower()
+        if host == "importyeti.com" or host.endswith(".importyeti.com"):
+            continue
+        query_keys = [key.lower() for key in parse_qs(parsed.query, keep_blank_values=True).keys()]
+        if any(key.startswith("utm_") or key in {"gclid", "fbclid"} for key in query_keys):
             continue
         websites.append(f"{parsed.scheme}://{parsed.netloc}{parsed.path or ''}")
     websites = sorted(set(websites))[:MAX_CONTACT_VALUES]
@@ -297,9 +301,12 @@ def find_contacts(company: str) -> list[sqlite3.Row]:
 @app.route("/", methods=["GET"])
 def index():
     q = normalize_str(request.args.get("q", ""))
+    uploaded = normalize_str(request.args.get("uploaded", ""))
     shipments = find_shipments(q) if q else []
     contacts = find_contacts(q) if q else []
-    return render_template("index.html", query=q, shipments=shipments, contacts=contacts)
+    return render_template(
+        "index.html", query=q, shipments=shipments, contacts=contacts, uploaded=uploaded
+    )
 
 
 @app.route("/upload", methods=["POST"])

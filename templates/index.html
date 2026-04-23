@@ -19,6 +19,9 @@
 <body>
   <h1>Bill of Lading Contact Portal</h1>
   <p class="muted">Single-user local portal (no login). Upload BOL CSV and enrich company contacts from ImportYeti + free sources.</p>
+  {% if uploaded %}
+  <p><strong>Upload complete:</strong> {{ uploaded }} rows ingested.</p>
+  {% endif %}
 
   <div class="card">
     <h2>1) Upload Bill of Lading CSV</h2>
